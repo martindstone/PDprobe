@@ -65,6 +65,7 @@ def report_results(check_results):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     global check_results
+    token = os.environ.get('TOKEN')
     # just look for an incident.trigger event
     if request.method == 'POST':
         try:
@@ -74,6 +75,7 @@ def index():
             service_name = content['messages'][0]['incident']['service']['name']
             print(f"got {event} on service {service_name}")
             check_results[service_name]['webhooks'] = 'success'
+            teardown(service_name, token)
         except Exception as e:
             print(f"oops! {e}")
             pass
@@ -172,9 +174,13 @@ def destroy_service(token, ep_id):
     """ destroy a service in PD """
     return pd.request(token=token, endpoint=f"services/{ep_id}", method="DELETE")
 
-def teardown(name, token, service_id, ep_id):
+def teardown(name, token):
+    global checks
     global check_results
+    global timers
+
     if check_results[name]:
+        check_results[name]['time_ended'] = datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
         if check_results[name]['events'] == 'success' and check_results[name]['webhooks'] == 'not tested':
             # we sent an event but didn't get a webhook
             check_results[name]['webhooks'] = 'fail'
@@ -182,10 +188,19 @@ def teardown(name, token, service_id, ep_id):
         report_results(check_results[name])
         del check_results[name]
 
-    print(f"Destroying service {service_id}")
-    destroy_service(token, service_id)
-    print(f"Destroying escalation policy {ep_id}")
-    destroy_escalation_policy(token, ep_id)
+    if timers[name] and isinstance(timers[name], threading.Timer):
+        timers[name].cancel()
+        del timers[name]
+
+    if checks[name]:
+        if checks[name]['service_id']:
+            print(f"Destroying service {checks[name]['service_id']}")
+            destroy_service(token, checks[name]['service_id'])
+        if checks[name]['ep_id']:
+            print(f"Destroying escalation policy {checks[name]['ep_id']}")
+            destroy_escalation_policy(token, checks[name]['ep_id'])
+        del checks[name]
+
 
 def check_pd():
     """ check all the PD things """
@@ -196,9 +211,12 @@ def check_pd():
     service_id = None
     ep_id = None
 
+    global checks
     global check_results
+    global timers
+
     check_results[name] = {
-        'time_started': datetime.now().replace(microsecond=0).isoformat() + 'Z',
+        'time_started': datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
         'rest': 'not tested',
         'events': 'not tested',
         'webhooks': 'not tested',
@@ -231,6 +249,10 @@ def check_pd():
 
         if ep_id and service_id and routing_key:
             check_results[name]['rest'] = 'success'
+            checks[name] = {
+                "service_id": service_id,
+                "ep_id": ep_id
+            }
         else:
             check_results[name]['rest'] = 'fail'
     except Exception as e:
@@ -253,10 +275,12 @@ def check_pd():
 
     
     # destroy everything later
-    t = threading.Timer(10.0, teardown, kwargs={"name": name, "token": token, "service_id": service_id, "ep_id": ep_id})
-    t.start()
+    timers[name] = threading.Timer(10.0, teardown, kwargs={"name": name, "token": token})
+    timers[name].start()
 
+checks = {}
 check_results = {}
+timers = {}
 
 # Make a public URL to tunnel to this webhook listener
 ngrok.connect(5000)
