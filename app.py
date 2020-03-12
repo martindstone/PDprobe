@@ -43,7 +43,8 @@ def report_results(check_results):
     #     "rest": <one of "success", "fail", "not tested">,
     #     "events": <one of "success", "fail", "not tested">,
     #     "webhooks": <one of "success", "fail", "not tested">,
-    #     "errors": [an array of strings representing any errors that were encountered while testing]
+    #     "errors": [an array of strings representing any errors that were encountered while testing],
+    #     "time_ended": <UTC time when the test was ended, in ISO8601 format>,
     # }
     #
     # Example for a successful test:
@@ -293,3 +294,5 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(check_pd, CronTrigger.from_crontab(CHECK_SCHEDULE))
 scheduler.start()
 
+if __name__ == '__main__':
+    app.run()
