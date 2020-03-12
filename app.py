@@ -13,6 +13,14 @@ CHECK_SCHEDULE = "* * * * *"
 # Check out https://crontab.guru if you need help with cron expressions
 
 
+# Optional email of a user to assign test incidents to. This user will receive
+# low-urgency notifications of test incident whenever the check is run. This
+# user must exist or else the 'rest' check will fail
+#
+# Set it to None if you just want to get the first user alphabetically in the domain.
+#
+CHECK_USER = None
+
 import os
 import time
 from datetime import datetime
@@ -97,7 +105,7 @@ def index():
 
 def create_escalation_policy(token, name):
     """ create an escalation policy in PD """
-    users = pd.request(token=token, endpoint="users", params={"limit": 1})
+    users = pd.request(token=token, endpoint="users", params={"limit": 1, "query": CHECK_USER})
     user = users['users'][0]
 
     body = {
