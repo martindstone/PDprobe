@@ -215,7 +215,7 @@ def teardown(name, token):
     global check_results
     global timers
 
-    if check_results[name]:
+    if name in check_results:
         check_results[name]['time_ended'] = datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
         if check_results[name]['events'] == 'success' and check_results[name]['webhooks'] == 'not tested':
             # we sent an event but didn't get a webhook
@@ -224,15 +224,15 @@ def teardown(name, token):
         report_results(check_results[name])
         del check_results[name]
 
-    if timers[name] and isinstance(timers[name], threading.Timer):
+    if name in timers and isinstance(timers[name], threading.Timer):
         timers[name].cancel()
         del timers[name]
 
-    if checks[name]:
-        if checks[name]['service_id']:
+    if name in checks:
+        if 'service_id' in checks[name]:
             print(f"Destroying service {checks[name]['service_id']}")
             destroy_service(token, checks[name]['service_id'])
-        if checks[name]['ep_id']:
+        if 'ep_id' in checks[name]:
             print(f"Destroying escalation policy {checks[name]['ep_id']}")
             destroy_escalation_policy(token, checks[name]['ep_id'])
         del checks[name]
