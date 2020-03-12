@@ -17,10 +17,15 @@ Get a read/write PagerDuty API token (Configuration > API Access in the PD UI) a
 TOKEN=<YOUR_API_TOKEN> flask run
 ```
 
-The script will check PagerDuty every minute (by default) and report the results. It does the following actions with each check:
+The script will check PagerDuty every minute (by default) and report the results. 
+
+It does the following actions at startup:
 
 * Creates a local listener to receive PagerDuty webhooks
 * Sets up a tunnel to receive webhooks locally using ngrok
+
+Then, each time the check is run, it:
+
 * Creates an escalation policy with a single user in it
 * Creates a service with that escalation policy
 * Adds a PagerDuty Events v2 integration to the service
@@ -36,3 +41,4 @@ See the `report_results` function in app.py for an example of the report structu
 
 * Change the `CHECK_SCHEDULE` variable at the top of app.py to check at an appropriate interval  some examples are provided in the file
 * Change the `report_results` function at the top of app.py to do something useful with the test results. In the default provided, it just prints the results to the terminal. 
+* Change the `CHECK_USER` variable at the top of app.py to the PagerDuty login email of a user to get assigned the test incidents. This user will receive a low urgency incident notification each time the check is run. If `CHECK_USER` is `None`, the user who is alphabetically first in the domain will be used.
