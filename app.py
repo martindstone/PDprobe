@@ -56,6 +56,19 @@ def report_results(check_results):
     #     "errors": []
     # }
     #
+    # Example for a test where webhooks didn't arrive:
+    #
+    # {
+    #     "time_started": "2020-03-12T14:57:00Z",
+    #     "rest": "success",
+    #     "events": "success",
+    #     "webhooks": "fail",
+    #     "errors": [
+    #         "Timed out waiting for webhook"
+    #     ],
+    #     "time_ended": "2020-03-12T14:57:14Z"
+    # }
+    #
     print("PD check results:")
     print("----------------------------------")
     print(json.dumps(check_results, indent=4))
@@ -72,11 +85,11 @@ def index():
         try:
             content = request.get_json(force=True)
             event = content['messages'][0]['event']
-            service_id = content['messages'][0]['incident']['service']['id']
             service_name = content['messages'][0]['incident']['service']['name']
-            print(f"got {event} on service {service_name}")
-            check_results[service_name]['webhooks'] = 'success'
-            teardown(service_name, token)
+            print(f"Got {event} on service {service_name}")
+            if event == "incident.trigger":
+                check_results[service_name]['webhooks'] = 'success'
+                teardown(service_name, token)
         except Exception as e:
             print(f"oops! {e}")
             pass
@@ -164,6 +177,20 @@ def send_trigger(routing_key, dedup_key):
         "routing_key": routing_key,
         "dedup_key": dedup_key,
         "event_action": "trigger"
+    }
+    return pd.send_v2_event(payload)
+
+def send_resolve(routing_key, dedup_key):
+    """ send a resolve alert """
+    payload = {
+        "payload": {
+            "summary": f"Test {dedup_key}",
+            "source": f"{dedup_key}",
+            "severity": "critical",
+        },
+        "routing_key": routing_key,
+        "dedup_key": dedup_key,
+        "event_action": "resolve"
     }
     return pd.send_v2_event(payload)
 
@@ -263,13 +290,21 @@ def check_pd():
     try:
         if routing_key:
             # send an event
-            print(f"Sending test alert to {routing_key}")
+            print(f"Sending trigger to {routing_key}")
             trigger_response = send_trigger(routing_key=routing_key, dedup_key=name)
             if trigger_response['status'] == 'success' and trigger_response['dedup_key'] == name:
                 check_results[name]['events'] = 'success'
             else:
                 check_results[name]['events'] = 'fail'
                 check_results[name]['errors'].append(str(trigger_response))
+            print(f"Sending resolve to {routing_key}")
+            resolve_response = send_resolve(routing_key=routing_key, dedup_key=name)
+            if resolve_response['status'] == 'success' and resolve_response['dedup_key'] == name:
+                pass
+            else:
+                check_results[name]['events'] = 'fail'
+                check_results[name]['errors'].append(str(resolve_response))
+
 
     except:
         check_results[name]['events'] = 'fail'
