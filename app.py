@@ -21,6 +21,11 @@ CHECK_SCHEDULE = "* * * * *"
 #
 CHECK_USER = None
 
+# Optional ID of a team within which to create Services and Escalation
+# Policies (and hence Incidents) - use this with a private team ID to hide
+# PDprobe-generated incidents from all non-admin users.
+TEAM_ID = None
+
 import os
 import time
 from datetime import datetime
@@ -126,6 +131,14 @@ def create_escalation_policy(token, name):
             "description": "PDprobe transient"
         }
     }
+    if TEAM_ID:
+        body['teams'] = [
+            {
+                "type": "team_reference",
+                "id": TEAM_ID
+            }
+        ]
+
     return pd.request(token=token, endpoint="escalation_policies", method="POST", data=body)
 
 def create_service(token, name, ep_id):
@@ -145,6 +158,14 @@ def create_service(token, name, ep_id):
             "alert_creation": "create_alerts_and_incidents"
         }
     }
+    if TEAM_ID:
+        body['teams'] = [
+            {
+                "type": "team_reference",
+                "id": TEAM_ID
+            }
+        ]
+
     return pd.request(token=token, endpoint="services", method="POST", data=body)
 
 def create_integration(token, service_id):
